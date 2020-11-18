@@ -1,0 +1,36 @@
+{
+  "variables": {
+    "___box_version": "3.9.4",
+	"box_name_prefix": "TMP-",
+	"___box_name": "alpine-clean",
+    "__out_dir": "../output-box",
+    "cloud_token": "{{ env `VAGRANT_CLOUD_TOKEN` }}"
+  },
+
+  "builders": [
+    {
+      "type": "null",
+      "communicator": "none"
+    }
+  ],
+
+  "post-processors": [
+    {
+      "type": "shell-local",
+      "inline": ["echo Doing stuff... {{user `box_version`}}"]
+    },
+    [
+      {
+        "type": "artifice",
+        "files": ["{{user `out_dir`}}/{{user `box_name`}}-{{user `box_version`}}_*.box"]
+      },
+      {
+        "type": "vagrant-cloud",
+        "box_tag": "MaxPeal/{{user `box_name`}}",
+        "access_token": "{{user `cloud_token`}}",
+        "version": "{{user `box_version`}}-{{timestamp}}"
+      }
+    ]
+  ]
+}
+

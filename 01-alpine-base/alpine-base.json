@@ -1,7 +1,14 @@
 {
 "min_packer_version": "1.3.4",
   "variables": {
-    "src_name": "alpine-clean",
+    "box_version": "3.9.4",
+	"box_src_name_prefix": "TMP-",
+	"box_src_name_suffix": "alpine-clean",
+	"box_name_prefix": "TMP-",
+	"box_name": "alpine-base",
+	"box_build_name": "{{ user `box_name_prefix`}}{{ user `box_name`}}",
+    "___src_name": "alpine-clean",
+    "box_src_name": "{{ user `box_src_name_prefix`}}{{ user `box_src_name_suffix`}}",
     "name": "alpine-base",
     "version": "3.9.4",
     "headless": "false",
@@ -14,18 +21,18 @@
 	"___ssh_wait_timeout": "1800s",
 	"___boot_wait": "30s",
 	"boot_wait": "12s",
-    "out_dir": "output-box",
-    "source_path": "../00-iso-install/output-virtualbox-iso",
+    "out_dir": "../output-box",
+    "box_source_path": "../00-iso-install/output-virtualbox-iso",
     "___shutdown_command": "poweroff",
 	"shutdown_command": "/sbin/poweroff"
   },
   "builders": [
     {
       "type": "virtualbox-ovf",
-      "source_path": "{{user `source_path`}}/{{user `src_name`}}-{{user `version`}}.ovf",
+      "source_path": "{{user `box_source_path`}}/{{user `box_src_name`}}-{{user `version`}}.ovf",
       "virtualbox_version_file": ".vbox_version",
       "boot_wait": "{{user `boot_wait`}}",
-      "vm_name": "alpine-amd64-{{user `version`}}",
+      "vm_name": "{{ user `box_build_name`}}-{{user `box_version`}}",
       "guest_additions_mode": "disable",
       "headless": "{{user `headless`}}",
       "ssh_username": "root",
@@ -35,14 +42,16 @@
       "vboxmanage": [
         ["modifyvm", "{{.Name}}", "--memory", "{{user `memory`}}"],
         ["modifyvm", "{{.Name}}", "--cpus", "{{user `cpus`}}"]
-      ]
+      ],
+      "cd_files": ["./cd_files_dir/*"],
+      "cd_label": "cidata"
     }
   ],
   "provisioners": [
   {	"type": "breakpoint",	"disable": "{{user `provisioners-breakpoint-disable`}}",	"note": "provisioners breakpoint"	},
     {
       "type": "shell",
-	  "environment_vars": [
+      "environment_vars": [
         "http_proxy={{user `proxy`}}",
 		"PATH=$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
       ],
@@ -59,9 +68,18 @@
       ]
     }
   ],
-  "post-processors": [{
+  "post-processors": [
+  {
     "type": "vagrant",
-    "keep_input_artifact": true,
-    "output": "{{user `out_dir`}}/{{user `name`}}-{{user `version`}}.box"
-  }]
+    "compression_level": 6,
+    "keep_input_artifact": false,
+    "output": "{{user `out_dir`}}/{{user `name`}}-{{user `version`}}_{{.Provider}}.box"
+  },
+  {
+    "type": "vagrant",
+    "compression_level": 6,
+    "keep_input_artifact": false,
+    "output": "{{user `out_dir`}}/packer_{{.BuildName}}_{{.Provider}}.box"
+  }
+  ]
 }

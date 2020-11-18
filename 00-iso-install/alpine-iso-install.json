@@ -1,38 +1,49 @@
 {
-"min_packer_version": "1.3.4",
+"min_packer_version": "1.6.0",
   "variables": {
     "iso_file": "http://dl-4.alpinelinux.org/alpine/v3.9/releases/x86_64/alpine-virt-3.9.4-x86_64.iso",
-    "iso_checksum": "4122dce1092564aa88415c21702d6cb973a7d29f91658d24316f7f0aac3a6761",
-	"___iso_checksum_x86": "921d49142c6376b5196bb268a39e2da304b5e09dac65852f2af6ae9711ec62b4",
+    "iso_checksum": "sha256:4122dce1092564aa88415c21702d6cb973a7d29f91658d24316f7f0aac3a6761",
+	"___iso_checksum_x86": "sha256:921d49142c6376b5196bb268a39e2da304b5e09dac65852f2af6ae9711ec62b4",
     "iso_checksum_type": "sha256",
-	"name": "alpine-clean",
-    "version": "3.9.4",
+	"box_name_prefix": "TMP-",
+	"box_name": "alpine-clean",
+	"box_build_name": "{{ user `box_name_prefix`}}{{ user `box_name`}}",
+    "box_version": "3.9.4",
     "headless": "false",
 	"provisioners-breakpoint-disable": "true",
-	"___provisioners-breakpoint-disable": "false",
+	"__provisioners-breakpoint-disable": "false",
+	"screen-recording": "off",
+	"___screen-recording": "on",
+	"recordingscreens": "0",
+	"recordingvideofps": "99",
+	"recordingmaxsize": "200",
+	"graphicscontroller": "vmsvga",
+	"graphicscontroller-foo": "none|vboxvga|vmsvga|vboxsvga]",
     "disk_size": "2048",
     "memory": "512",
+    "vram": "10",
     "cpus": "1",
+    "__cpus": "2",
     "ssh_password": "vagrant",
 	"___boot_wait": "30s",
 	"boot_wait": "12s",
     "ssh_wait_timeout": "1800s",
-    "out_dir": "output-box",
+    "out_dir": "../output-box",
     "shutdown_command": "/sbin/poweroff"
   },
   "builders": [
     {
-      "vm_name": "{{ user `name`}}-{{user `version`}}",
+      "vm_name": "{{ user `box_build_name`}}-{{user `box_version`}}",
 	  "type": "virtualbox-iso",
       "guest_additions_mode": "disable",
       "guest_os_type": "Linux_64",
       "headless": "{{user `headless`}}",
       "disk_size": "{{user `disk_size`}}",
 	  "hard_drive_discard": true,
+	  "hard_drive_nonrotational": true,
       "hard_drive_interface": "sata",
       "iso_url": "{{user `iso_file`}}",
       "iso_checksum": "{{user `iso_checksum`}}",
-      "iso_checksum_type": "{{user `iso_checksum_type`}}",
       "ssh_username": "root",
       "ssh_password": "{{user `ssh_password`}}",
       "ssh_wait_timeout": "{{user `ssh_wait_timeout`}}",
@@ -48,6 +59,7 @@
 		"sed -i -e \"s/rc-service/###rc-service/\" /sbin/setup-sshd<enter><wait>",
         "printf \"vagrant\\nvagrant\\ny\\n\" | setup-alpine -f /root/alpine39.answers.cfg ; ",
 		"mount /dev/sda2 /mnt && ",
+		"apk add --root /mnt sudo ; ",
 		"apk add --root /mnt dropbear dropbear-openrc dropbear-ssh dropbear-scp dropbear-convert ; ",
 		"apk add --root /mnt openssh-server ; ",
 		"echo 'PasswordAuthentication yes' >> /mnt/etc/ssh/sshd_config && ",
@@ -59,12 +71,36 @@
         "vboxmanage": [
         ["modifyvm", "{{.Name}}", "--memory", "{{user `memory`}}"],
         ["modifyvm", "{{.Name}}", "--cpus", "{{user `cpus`}}"],
+        ["modifyvm", "{{.Name}}", "--vram", "{{user `vram`}}"],
+        ["modifyvm", "{{.Name}}", "--recording", "{{user `screen-recording`}}"],
+        ["modifyvm", "{{.Name}}", "--recordingscreens", "{{user `recordingscreens`}}"],
+        ["modifyvm", "{{.Name}}", "--recordingvideofps", "{{user `recordingvideofps`}}"],
+        ["modifyvm", "{{.Name}}", "--recordingmaxsize", "{{user `recordingmaxsize`}}"],
+        ["modifyvm", "{{.Name}}", "--graphicscontroller", "{{user `graphicscontroller`}}"],
 		["modifyvm", "{{.Name}}", "--natdnsproxy1", "on"]
       ]
 
     }
   ],
   "provisioners": [
+    {  "type": "shell", "inline": [ "echo Connected via SSM at '{{build `User`}}@{{build `Host`}}:{{build `Port`}}'" ] },
+    {
+      "type":  "shell",
+      "environment_vars": ["FOO=foo",
+                           "BAR=bar's",
+                           "BAZ=baz=baz",
+                           "QUX==qux",
+                           "FOOBAR=foo bar",
+                           "FOOBARBAZ='foo bar baz'",
+                           "QUX2=\"qux\""],
+      "inline": ["echo \"FOO is $FOO\"",
+                 "echo \"BAR is $BAR\"",
+                 "echo \"BAZ is $BAZ\"",
+                 "echo \"QUX is $QUX\"",
+                 "echo \"FOOBAR is $FOOBAR\"",
+                 "echo \"FOOBARBAZ is $FOOBARBAZ\"",
+                 "echo \"QUX2 is $QUX2\""]
+    },
 	{	"type": "breakpoint",	"disable": "{{user `provisioners-breakpoint-disable`}}",	"note": "provisioners breakpoint"	},
 	    {
       "type": "shell",
@@ -75,8 +111,8 @@
 	  "use_env_var_file": "true",
       "execute_command": "/bin/sh -x '{{.Path}}'",
       "scripts": [
-        "scripts/98-cleanup.sh",
-        "scripts/99-minimize.sh"
+        "../01-alpine-base/scripts/98-cleanup.sh",
+        "../01-alpine-base/scripts/99-minimize.sh"
       ]
     }
   ],
@@ -84,7 +120,8 @@
 
   {
     "type": "vagrant",
+	"compression_level": 9,
     "keep_input_artifact": true,
-    "output": "{{user `out_dir`}}/{{user `name`}}-{{user `version`}}.box"
+	"output": "{{user `out_dir`}}/packer_{{user `box_name`}}-{{user `box_version`}}_{{.Provider}}.box"
   }]
 }
